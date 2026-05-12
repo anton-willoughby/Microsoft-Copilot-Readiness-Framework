@@ -130,6 +130,15 @@
         <button type="button" class="btn btn-outline-primary" id="btnAll">
           <i class="bi bi-play-circle me-1"></i>Run All
         </button>
+        {% if results %}
+        <a href="/report/download" class="btn btn-success">
+          <i class="bi bi-file-earmark-arrow-down me-1"></i>Generate HTML Report
+        </a>
+        {% else %}
+        <button type="button" class="btn btn-success" disabled title="Run at least one assessment first">
+          <i class="bi bi-file-earmark-arrow-down me-1"></i>Generate HTML Report
+        </button>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -179,8 +188,8 @@
       {% endif %}
       {% endfor %}
     </div>
-    <a href="/report" class="btn btn-success">
-      <i class="bi bi-file-earmark-richtext me-1"></i>Generate &amp; View HTML Report
+    <a href="/report" class="btn btn-outline-success">
+      <i class="bi bi-file-earmark-richtext me-1"></i>Open HTML Report
     </a>
   </div>
 </div>

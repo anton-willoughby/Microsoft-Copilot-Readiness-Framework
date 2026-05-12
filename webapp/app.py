@@ -6,6 +6,7 @@ import json
 import queue
 import threading
 import uuid
+from datetime import datetime
 
 from flask import (
     Flask,
@@ -270,6 +271,25 @@ def report():
     tenant_url = session.get("tenant_url", "")
     html = generate_report(results, tenant_url)
     return Response(html, mimetype="text/html")
+
+
+@app.route("/report/download")
+def report_download():
+    results = session.get("last_results")
+    if not results:
+        flash("Run at least one assessment first.", "warning")
+        return redirect(url_for("index"))
+
+    tenant_url = session.get("tenant_url", "")
+    html = generate_report(results, tenant_url)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"CopilotReadinessReport_{timestamp}.html"
+
+    return Response(
+        html,
+        mimetype="text/html",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

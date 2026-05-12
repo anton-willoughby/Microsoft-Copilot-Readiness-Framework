@@ -1,0 +1,4 @@
+.vscode/settings.json
+CopilotReadiness/Templates/report.html
+*.pyc
+*.venv/
