@@ -18,6 +18,16 @@ GRAPH_SCOPES = [
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 GRAPH_BETA  = "https://graph.microsoft.com/beta"
 
+# Graph request safety controls
+GRAPH_REQUEST_TIMEOUT_SECONDS = int(os.environ.get("GRAPH_REQUEST_TIMEOUT_SECONDS", "30"))
+GRAPH_REQUEST_MAX_RETRIES = int(os.environ.get("GRAPH_REQUEST_MAX_RETRIES", "4"))
+GRAPH_REQUEST_RETRY_BACKOFF_SECONDS = float(os.environ.get("GRAPH_REQUEST_RETRY_BACKOFF_SECONDS", "1.5"))
+GRAPH_PAGED_MAX_PAGES = int(os.environ.get("GRAPH_PAGED_MAX_PAGES", "500"))
+
+# Overshared content assessment safeguards
+OVERSHARED_MAX_RUNTIME_SECONDS = int(os.environ.get("OVERSHARED_MAX_RUNTIME_SECONDS", "900"))
+OVERSHARED_PROGRESS_INTERVAL_SITES = int(os.environ.get("OVERSHARED_PROGRESS_INTERVAL_SITES", "5"))
+
 # Flask
 SECRET_KEY = os.environ.get("FLASK_SECRET", os.urandom(32))
 SESSION_TYPE = "filesystem"

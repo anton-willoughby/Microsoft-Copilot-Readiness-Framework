@@ -1,5 +1,6 @@
 """Overshared content assessment — port of Get-CROversharedContent.ps1"""
 from datetime import datetime
+import time
 from services.graph_client import graph_get_paged, get_sites_list, get_group_member_count
 import config
 
@@ -39,6 +40,12 @@ def _enumerate_files(token: str, drive_id: str, item_id: str, file_list: list, s
 def run(token: str, log, include_onedrive: bool = False, sample_size: int = 100) -> dict:
     oversharing: list[dict] = []
     group_count_cache: dict[str, int] = {}
+    started_at = time.monotonic()
+    max_runtime_seconds = max(30, config.OVERSHARED_MAX_RUNTIME_SECONDS)
+    progress_interval = max(1, config.OVERSHARED_PROGRESS_INTERVAL_SITES)
+
+    def _runtime_exceeded() -> bool:
+        return (time.monotonic() - started_at) >= max_runtime_seconds
 
     def _group_member_count(group_id: str) -> int:
         if group_id not in group_count_cache:
@@ -47,11 +54,25 @@ def run(token: str, log, include_onedrive: bool = False, sample_size: int = 100)
 
     log("Retrieving SharePoint sites for oversharing analysis via Microsoft Search API...")
     sites = get_sites_list(token)
+    log(f"Discovered {len(sites)} site(s) before filtering.")
 
     if not include_onedrive:
         sites = [s for s in sites if "-my.sharepoint.com/personal/" not in s.get("webUrl", "")]
+        log(f"Filtered OneDrive personal sites. Remaining site(s): {len(sites)}")
 
-    for site in sites:
+    if _runtime_exceeded():
+        log(f"[Warning] Overshared content assessment hit runtime limit ({max_runtime_seconds}s) before processing sites.")
+        sites = []
+
+    for site_index, site in enumerate(sites, start=1):
+        if _runtime_exceeded():
+            log(f"[Warning] Runtime limit reached ({max_runtime_seconds}s). Stopping overshared scan early.")
+            break
+
+        if site_index == 1 or site_index % progress_interval == 0 or site_index == len(sites):
+            elapsed = int(time.monotonic() - started_at)
+            log(f"[Info] Overshared progress: site {site_index}/{len(sites)} (elapsed {elapsed}s)")
+
         site_id = site.get("id", "")
         if not site_id:
             continue
@@ -64,11 +85,27 @@ def run(token: str, log, include_onedrive: bool = False, sample_size: int = 100)
             log(f"[Warning] Skipping drives for {site.get('webUrl')}. {exc}")
             continue
 
+        if drives:
+            log(f"[Info] Found {len(drives)} drive(s) for site {site.get('webUrl', site_id)}")
+
         for drive in drives:
+            if _runtime_exceeded():
+                log(f"[Warning] Runtime limit reached ({max_runtime_seconds}s) during drive scan.")
+                break
+
             file_items: list = []
             _enumerate_files(token, drive["id"], "root", file_items, sample_size)
+            if file_items:
+                log(
+                    f"[Info] Evaluating permissions for {len(file_items)} file(s) "
+                    f"in drive {drive.get('name', drive.get('id', 'unknown'))}"
+                )
 
             for item in file_items:
+                if _runtime_exceeded():
+                    log(f"[Warning] Runtime limit reached ({max_runtime_seconds}s) during permission checks.")
+                    break
+
                 try:
                     permissions = graph_get_paged(
                         token,
