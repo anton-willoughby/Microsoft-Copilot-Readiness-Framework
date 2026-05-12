@@ -1,0 +1,4 @@
+flask>=3.0.0
+msal>=1.28.0
+requests>=2.31.0
+Flask-Session>=0.8.0

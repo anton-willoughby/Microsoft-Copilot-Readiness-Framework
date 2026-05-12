@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Copilot Readiness — Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero ─────────────────────────────────────────────────────────── -->
+<div class="p-4 mb-4 rounded-3 shadow-sm"
+     style="background:linear-gradient(135deg,#003a6c,#0078d4);color:#fff;">
+  <h2 class="fw-bold"><i class="bi bi-shield-check me-2"></i>Microsoft Copilot Readiness</h2>
+  <p class="mb-0 opacity-75">
+    Assess your Microsoft 365 tenant's readiness for Copilot adoption across five security dimensions.
+  </p>
+</div>
+
+<!-- ── Sign-in section ──────────────────────────────────────────────── -->
+<div id="signin-section">
+{% if not session.get('connected') %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-key me-1"></i>Connect to Microsoft 365</div>
+  <div class="card-body">
+    <form method="POST" action="/signin">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-8">
+          <label class="form-label fw-semibold" for="tenantUrl">SharePoint Admin URL</label>
+          <input type="url" id="tenantUrl" name="tenantUrl" class="form-control"
+                 placeholder="https://contoso-admin.sharepoint.com"
+                 pattern="https://[a-zA-Z0-9-]+-admin\.sharepoint\.com.*"
+                 required value="{{ request.form.get('tenantUrl','') }}"/>
+          <div class="form-text">Format: https://&lt;tenant&gt;-admin.sharepoint.com</div>
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Start Sign In
+          </button>
+        </div>
+      </div>
+    </form>
+
+    {% if device_flow %}
+    <hr/>
+    <div class="alert alert-info d-flex align-items-start gap-3">
+      <i class="bi bi-qr-code fs-2 mt-1"></i>
+      <div>
+        <p class="mb-1 fw-semibold">Open <a href="{{ device_flow.verification_uri }}" target="_blank">{{ device_flow.verification_uri }}</a> and enter:</p>
+        <p class="display-6 fw-bold letter-spacing-wide mb-2">{{ device_flow.user_code }}</p>
+        <p class="mb-2 text-muted small">Then click the button below once you've completed sign-in in the browser.</p>
+        <form method="POST" action="/signin/complete">
+          <input type="hidden" name="flow_key" value="{{ flow_key }}"/>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-circle me-1"></i>I've signed in — continue
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<!-- ── Connected status ──────────────────────────────────────────────── -->
+<div class="alert alert-success d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-check-circle-fill fs-5"></i>
+  <span>Connected as <strong>{{ session.get('connected_user') }}</strong>
+   to <strong>{{ session.get('org_name', session.get('tenant_url')) }}</strong></span>
+  <a href="/signout" class="btn btn-sm btn-outline-success ms-auto">
+    <i class="bi bi-box-arrow-right me-1"></i>Sign Out
+  </a>
+</div>
+
+<!-- ── Assessment controls ───────────────────────────────────────────── -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-clipboard-check me-1"></i>Assessments</div>
+  <div class="card-body">
+    <form id="assessmentForm" method="POST" action="/run">
+      <div class="row g-3 mb-3">
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="CAPolicies" id="chkCA" checked/>
+            <label class="form-check-label" for="chkCA">Conditional Access Policies</label>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="ExternalUserAccess" id="chkExt" checked/>
+            <label class="form-check-label" for="chkExt">External User Access</label>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="LabelCoverage" id="chkLabels" checked/>
+            <label class="form-check-label" for="chkLabels">Sensitivity Label Coverage</label>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="OversharedContent" id="chkOsh" checked/>
+            <label class="form-check-label" for="chkOsh">Overshared Content</label>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="RetentionLabels" id="chkRet" checked/>
+            <label class="form-check-label" for="chkRet">Retention Labels &amp; Policies</label>
+          </div>
+        </div>
+      </div>
+      <div class="row g-3 align-items-center mb-3">
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="include_onedrive" id="chkOD"/>
+            <label class="form-check-label" for="chkOD">Include OneDrive</label>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-4 d-flex align-items-center gap-2">
+          <label class="form-label mb-0 fw-semibold" for="sampleSize">Sample size per drive:</label>
+          <input type="number" id="sampleSize" name="sample_size" class="form-control form-control-sm"
+                 style="width:90px" value="100" min="0" max="5000"/>
+          <span class="text-muted small">(0 = full scan)</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary" id="btnRun">
+          <i class="bi bi-play-fill me-1"></i>Run Selected
+        </button>
+        <button type="button" class="btn btn-outline-primary" id="btnAll">
+          <i class="bi bi-play-circle me-1"></i>Run All
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Live log ──────────────────────────────────────────────────────── -->
+<div class="card shadow-sm mb-4" id="logCard" style="display:none">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span class="fw-semibold"><i class="bi bi-terminal me-1"></i>Live Output</span>
+    <div class="spinner-border spinner-border-sm text-primary" id="spinner" role="status"></div>
+  </div>
+  <div class="card-body p-0">
+    <div class="log-box" id="logBox"></div>
+  </div>
+</div>
+
+<!-- ── Results ───────────────────────────────────────────────────────── -->
+{% if results %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold"><i class="bi bi-bar-chart-line me-1"></i>Assessment Results</div>
+  <div class="card-body">
+    <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3 mb-3">
+      {% for key, display in [
+          ('CAPolicies','Conditional Access'),
+          ('ExternalUserAccess','External User Access'),
+          ('LabelCoverage','Sensitivity Labels'),
+          ('OversharedContent','Overshared Content'),
+          ('RetentionLabels','Retention Labels')
+      ] %}
+      {% set r = results.get(key) %}
+      {% if r %}
+      <div class="col">
+        <div class="card h-100 border-0 shadow-sm text-center">
+          <div class="card-body">
+            <p class="card-title fw-semibold small mb-1">{{ display }}</p>
+            <p class="display-6 fw-bold mb-0">{{ r.ReadinessScore | round(1) }}</p>
+            <small class="text-muted">/ 100</small><br>
+            <span class="badge
+              {% if r.ReadinessRating == 'Ready' %}bg-success
+              {% elif r.ReadinessRating == 'Nearly Ready' %}bg-info text-dark
+              {% elif r.ReadinessRating == 'Requires Work' %}bg-warning text-dark
+              {% else %}bg-danger{% endif %}
+              mt-1">{{ r.ReadinessRating }}</span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    <a href="/report" class="btn btn-success">
+      <i class="bi bi-file-earmark-richtext me-1"></i>Generate &amp; View HTML Report
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}{# /connected #}
+</div>{# /signin-section #}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Select all checkboxes when "Run All" is clicked
+  document.getElementById('btnAll')?.addEventListener('click', () => {
+    document.querySelectorAll('.assessment-cb').forEach(cb => cb.checked = true);
+    document.getElementById('assessmentForm').submit();
+  });
+
+  // SSE log streaming
+  {% if running %}
+  const logBox = document.getElementById('logBox');
+  document.getElementById('logCard').style.display = '';
+
+  const src = new EventSource('/log-stream');
+  src.addEventListener('log', e => {
+    const line = document.createElement('div');
+    const text = e.data;
+    if (text.includes('[Success]')) line.className = 'log-success';
+    else if (text.includes('[Warning]')) line.className = 'log-warning';
+    else if (text.includes('[Error]'))   line.className = 'log-error';
+    line.textContent = text;
+    logBox.appendChild(line);
+    logBox.scrollTop = logBox.scrollHeight;
+  });
+  src.addEventListener('done', e => {
+    src.close();
+    document.getElementById('spinner').style.display = 'none';
+    window.location.reload();
+  });
+  src.onerror = () => { src.close(); document.getElementById('spinner').style.display = 'none'; };
+  {% endif %}
+</script>
+{% endblock %}
