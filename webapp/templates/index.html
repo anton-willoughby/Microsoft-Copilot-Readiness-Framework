@@ -227,7 +227,9 @@
   src.addEventListener('done', e => {
     src.close();
     document.getElementById('spinner').style.display = 'none';
-    window.location.reload();
+    const doneUrl = new URL(window.location.href);
+    doneUrl.searchParams.delete('running');
+    window.location.href = doneUrl.toString();
   });
   src.onerror = () => { src.close(); document.getElementById('spinner').style.display = 'none'; };
   {% endif %}

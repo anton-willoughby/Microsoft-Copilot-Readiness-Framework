@@ -249,10 +249,8 @@ def log_stream():
                 yield ": keepalive\n\n"
                 continue
             if item is None:
-                # Assessment complete — transfer results to session
-                if sid in _pending_results:
-                    session["last_results"] = _pending_results.pop(sid)
-                    session.modified = True
+                # Assessment complete. Avoid mutating session during streaming response;
+                # index() will transfer _pending_results into session safely.
                 yield "event: done\ndata: complete\n\n"
                 return
             # Colour-code by log level prefix
