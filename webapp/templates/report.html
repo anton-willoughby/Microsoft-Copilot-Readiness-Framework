@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SharePoint Permissions Assessment</title>
+</head>
+<body>
+    <main>
+        <section id="overview" class="mb-5">
+            <h2 class="border-bottom pb-2 mb-3">Overview</h2>
+            <p>This section details the permissions for SharePoint sites and their document libraries.</p>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Site: {{ site.name }}</h4>
+                    <p class="mb-0"><a href="{{ site.url }}" target="_blank">{{ site.url }}</a></p>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">Site-Level Permissions</h5>
+                    {% if site.permissions %}
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>User / Group</th>
+                                    <th>Roles</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for perm in site.permissions %}
+                                    <tr>
+                                        <td>{{ perm.user }}</td>
+                                        <td>{{ perm.roles | join(', ') }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>No explicit permissions found at the site level.</p>
+                    {% endif %}
+
+                    <hr>
+
+                    <h5 class="card-title mt-4">Document Library Permissions</h5>
+                    {% if site.libraries %}
+                        {% for library in site.libraries %}
+                            <div class="ms-3 mb-3">
+                                <h6>Library: {{ library.name }}</h6>
+                                {% if library.permissions %}
+                                    <table class="table table-bordered table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>User / Group</th>
+                                                <th>Roles</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for perm in library.permissions %}
+                                                <tr>
+                                                    <td>{{ perm.user }}</td>
+                                                    <td>{{ perm.roles | join(', ') }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% else %}
+                                    <p>This library inherits permissions from the site.</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <p>No document libraries with unique permissions found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+    {% endif %}
+
+</main>
+</body>
+</html>

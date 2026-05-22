@@ -1,6 +1,6 @@
 """
 Microsoft Copilot Readiness Assessment — Flask web application.
-Converts the PowerShell-based CopilotReadiness module to a cross-platform Python web app.
+Runs Microsoft 365 Copilot readiness assessments through a local Python web app.
 """
 import queue
 import re
@@ -22,7 +22,14 @@ from flask_session import Session
 
 import config
 from services import auth as auth_svc
-from assessments import ca_policies, external_users, label_coverage, overshared_content, retention
+from assessments import ca_policies
+from assessments import defender_posture
+from assessments import external_users
+from assessments import label_coverage
+from assessments import m365_licensing
+from assessments import overshared_content
+from assessments import retention
+from assessments import sharepoint_permissions
 from services.report_generator import generate as generate_report
 
 app = Flask(__name__)
@@ -182,10 +189,14 @@ def run_assessments():
         results = {}
         assessment_map = {
             "CAPolicies": lambda: ca_policies.run(token, log),
+            "DefenderPosture": lambda: defender_posture.run(token, log),
             "ExternalUserAccess": lambda: external_users.run(token, log),
             "LabelCoverage": lambda: label_coverage.run(token, log, include_onedrive=include_od, sample_size=sample_size),
+            "M365Licensing": lambda: m365_licensing.run(token, log),
             "OversharedContent": lambda: overshared_content.run(token, log, include_onedrive=include_od, sample_size=sample_size),
             "RetentionLabels": lambda: retention.run(token, log),
+            "RetentionPolicies": lambda: retention.run(token, log),
+            "SharePointPermissions": lambda: sharepoint_permissions.run(token, log),
         }
         for name in selected:
             if name in assessment_map:

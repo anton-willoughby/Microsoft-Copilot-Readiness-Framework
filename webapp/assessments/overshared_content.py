@@ -1,4 +1,4 @@
-"""Overshared content assessment — port of Get-CROversharedContent.ps1"""
+"""Overshared content assessment."""
 from datetime import datetime
 import time
 from services.graph_client import graph_get_paged, get_sites_list, get_group_member_count

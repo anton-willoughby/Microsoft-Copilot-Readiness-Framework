@@ -1,10 +1,4 @@
-"""Retention labels & policies assessment — Graph-based port of Get-CRRetentionAssessment.ps1.
-
-Note: The original PowerShell implementation queries the Security & Compliance PowerShell
-module (Get-ComplianceTag, Get-RetentionCompliancePolicy). Those cmdlets have no direct REST API
-equivalent. This port uses the Microsoft Graph compliance/retention endpoints (beta) which
-provide equivalent data via delegated access.
-"""
+"""Retention labels and policies assessment using Microsoft Graph beta endpoints."""
 from datetime import datetime
 from services.graph_client import graph_get_paged
 import config

@@ -162,7 +162,7 @@ A workload only earns its points once regardless of how many policies cover it.
 
 **Example:** SharePoint (+25) + Exchange (+20) + delete action present (+20) = **65 / 100** (Nearly Ready).
 
-> This assessment requires a Security & Compliance PowerShell session. If S&C is unavailable the assessment score is 0.
+> The Python implementation uses Microsoft Graph retention endpoints and does not require Security & Compliance command modules.
 
 ---
 
@@ -180,10 +180,10 @@ Only assessments that completed without error contribute to the average. A faile
 
 | Assessment | Scoring logic location |
 |---|---|
-| Conditional Access | `CopilotReadiness/Public/Get-CRCAPolicyAssessment.ps1` lines 181–210, 266–285 |
-| External User Access | `CopilotReadiness/Public/Get-CRExternalUserAccess.ps1` lines 183–210, 393–413 |
-| Sensitivity Labels | `CopilotReadiness/Public/Get-CRLabelCoverage.ps1` lines 199–229 |
-| Overshared Content | `CopilotReadiness/Public/Get-CROversharedContent.ps1` lines 218–223 |
-| Retention Labels | `CopilotReadiness/Public/Get-CRRetentionAssessment.ps1` lines 236–243 |
-| Rating thresholds | `CopilotReadiness/Private/Get-CRReadinessRating.ps1` |
-| Overall average | `CopilotReadiness/Public/New-CRReadinessReport.ps1` lines 84–97 |
+| Conditional Access | `webapp/assessments/ca_policies.py` |
+| External User Access | `webapp/assessments/external_users.py` |
+| Sensitivity Labels | `webapp/assessments/label_coverage.py` |
+| Overshared Content | `webapp/assessments/overshared_content.py` |
+| Retention Labels | `webapp/assessments/retention.py` |
+| Rating thresholds | Assessment modules and `webapp/services/report_generator.py` |
+| Overall average | `webapp/services/report_generator.py` |

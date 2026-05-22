@@ -1,4 +1,4 @@
-"""Sensitivity label coverage assessment — port of Get-CRLabelCoverage.ps1"""
+"""Sensitivity label coverage assessment."""
 import os
 import re
 from datetime import datetime

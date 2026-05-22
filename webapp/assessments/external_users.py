@@ -1,4 +1,4 @@
-"""External user access assessment — port of Get-CRExternalUserAccess.ps1"""
+"""External user access assessment."""
 import re
 from datetime import datetime, timezone
 from services.graph_client import graph_get_paged, graph_get, get_sites_list

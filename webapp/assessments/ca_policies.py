@@ -1,4 +1,4 @@
-"""Conditional Access policy assessment — port of Get-CRCAPolicyAssessment.ps1"""
+"""Conditional Access policy assessment."""
 import math
 from datetime import datetime
 from services.graph_client import graph_get_paged

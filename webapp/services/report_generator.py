@@ -1,4 +1,4 @@
-"""HTML report generator — port of New-CRReadinessReport.ps1"""
+"""HTML report generator for Copilot readiness assessment results."""
 from html import escape
 from datetime import datetime
 
@@ -16,6 +16,8 @@ DIMENSIONS = [
     ("LabelCoverage", "Sensitivity Labels"),
     ("OversharedContent", "Overshared Content"),
     ("RetentionLabels", "Retention Labels"),
+    ("M365Licensing", "M365 Licensing"),
+    ("DefenderPosture", "Defender Posture"),
 ]
 
 
@@ -51,6 +53,43 @@ def _score_card(name: str, score: float, rating: str) -> str:
         f"<span class='badge {badge} mt-2'>{escape(rating)}</span>"
         f"</div></div></div>"
     )
+
+
+PRIORITY_ORDER = {"High": 0, "Medium": 1, "Low": 2}
+PRIORITY_BADGE = {"High": "bg-danger", "Medium": "bg-warning text-dark", "Low": "bg-secondary"}
+STATUS_BADGE = {
+    "Compliant": "bg-success",
+    "Warning": "bg-warning text-dark",
+    "Not Configured": "bg-danger",
+}
+
+
+def _priority_badge(p: str) -> str:
+    cls = PRIORITY_BADGE.get(p, "bg-secondary")
+    return f"<span class='badge {cls}'>{escape(p)}</span>"
+
+
+def _status_badge(s: str) -> str:
+    cls = STATUS_BADGE.get(s, "bg-secondary")
+    return f"<span class='badge {cls}'>{escape(s)}</span>"
+
+
+def _recommendations_html(all_recs: list) -> str:
+    if not all_recs:
+        return "<p class='text-muted'>No recommendations generated — all assessed areas appear compliant.</p>"
+    sorted_recs = sorted(all_recs, key=lambda r: PRIORITY_ORDER.get(r.get("Priority", "Low"), 2))
+    rows = []
+    for r in sorted_recs:
+        rows.append(
+            f"<tr>"
+            f"<td>{_priority_badge(r.get('Priority',''))}</td>"
+            f"<td>{_status_badge(r.get('Status',''))}</td>"
+            f"<td><small>{escape(r.get('Area',''))}</small></td>"
+            f"<td>{escape(r.get('Observation',''))}</td>"
+            f"<td>{escape(r.get('Recommendation',''))}</td>"
+            f"</tr>"
+        )
+    return "".join(rows)
 
 
 def generate(results: dict, tenant_url: str) -> str:
@@ -110,7 +149,156 @@ def generate(results: dict, tenant_url: str) -> str:
     radar_labels_js = str(radar_labels).replace("'", '"')
     radar_data_js = str(radar_data)
 
+    # M365 Licensing
+    lic = results.get("M365Licensing")
+    lic_summary = (lic.get("Summary") or {}) if lic else {}
+    lic_rows = (lic.get("Findings") or [])[:50] if lic else []
+
+    # Defender Posture
+    dfn = results.get("DefenderPosture")
+    dfn_summary = (dfn.get("Summary") or {}) if dfn else {}
+    dfn_risky_users = (dfn.get("RiskyUsers") or [])[:25] if dfn else []
+    dfn_oauth_risks = (dfn.get("OAuthRisks") or [])[:25] if dfn else []
+    dfn_mfa = (dfn.get("MFACoverage") or {}) if dfn else {}
+
+    # SharePoint Permissions
+    sp_perms = results.get("SharePointPermissions")
+    sp_sites = (sp_perms.get("sites") or []) if sp_perms else []
+
+    # Aggregate recommendations from all assessments that produce them
+    all_recommendations: list = []
+    for key in ("M365Licensing", "DefenderPosture", "CAPolicies"):
+        r = results.get(key)
+        if r and isinstance(r.get("Recommendations"), list):
+            all_recommendations.extend(r["Recommendations"])
+    recommendations_html = _recommendations_html(all_recommendations)
+
     generated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # ---- Pre-compute complex HTML sections (avoid nested f-strings) ----
+
+    # M365 Licensing section
+    if lic:
+        lic_available = lic_summary.get("CopilotLicensesAvailable", 0) or 0
+        try:
+            avail_int = int(lic_available)
+        except (TypeError, ValueError):
+            avail_int = 0
+        avail_cls = "text-warning" if avail_int < 0 else "text-secondary"
+        lic_section = (
+            '<h2 class="section-header">M365 Copilot Licensing</h2>'
+            '<div class="row g-3 mb-3">'
+            '<div class="col-sm-4"><div class="card text-center shadow-sm p-3">'
+            '<div class="display-6 fw-bold text-primary">' + escape(str(lic_summary.get("CopilotLicensesPurchased", "N/A"))) + '</div>'
+            '<small class="text-muted">Copilot Licenses Purchased</small></div></div>'
+            '<div class="col-sm-4"><div class="card text-center shadow-sm p-3">'
+            '<div class="display-6 fw-bold text-success">' + escape(str(lic_summary.get("CopilotLicensesConsumed", "N/A"))) + '</div>'
+            '<small class="text-muted">Assigned to Users</small></div></div>'
+            '<div class="col-sm-4"><div class="card text-center shadow-sm p-3">'
+            '<div class="display-6 fw-bold ' + avail_cls + '">' + escape(str(lic_available)) + '</div>'
+            '<small class="text-muted">Available / Unassigned</small></div></div>'
+            '</div>'
+            '<div class="table-responsive mb-4"><table class="table table-sm table-striped table-hover">'
+            '<thead class="table-dark"><tr>'
+            '<th>SKU</th><th>Purchased</th><th>Consumed</th><th>Available</th><th>Status</th><th>Copilot Service Plans</th>'
+            '</tr></thead><tbody>' +
+            _rows(lic_rows, ["SkuPartNumber", "Purchased", "Consumed", "Available", "Status", "CopilotServicePlans"]) +
+            '</tbody></table></div>'
+        )
+    else:
+        lic_section = '<p class="text-muted">M365 Licensing assessment was not run.</p>'
+
+    # Defender section
+    if dfn:
+        risky_count = dfn_summary.get("RiskyUsersHighMedium", 0) or 0
+        try:
+            risky_int = int(risky_count)
+        except (TypeError, ValueError):
+            risky_int = 0
+        risky_cls = "text-danger" if risky_int > 0 else "text-success"
+        oauth_count = dfn_summary.get("OAuthAppsWithBroadPermissions", 0) or 0
+        try:
+            oauth_int = int(oauth_count)
+        except (TypeError, ValueError):
+            oauth_int = 0
+        oauth_cls = "text-warning" if oauth_int > 0 else "text-success"
+
+        risky_table = (
+            '<h5 class="mt-3">Risky Users</h5>'
+            '<div class="table-responsive mb-3"><table class="table table-sm table-striped table-hover">'
+            '<thead class="table-dark"><tr><th>Display Name</th><th>UPN</th><th>Risk Level</th><th>Risk State</th><th>Last Updated</th></tr></thead>'
+            '<tbody>' + _rows(dfn_risky_users, ["DisplayName", "UPN", "RiskLevel", "RiskState", "LastUpdated"]) + '</tbody></table></div>'
+        ) if dfn_risky_users else '<p class="text-success small">No risky users detected.</p>'
+
+        oauth_table = (
+            '<h5 class="mt-3">OAuth Apps with Broad Permissions</h5>'
+            '<div class="table-responsive mb-4"><table class="table table-sm table-striped table-hover">'
+            '<thead class="table-dark"><tr><th>App Name</th><th>App ID</th><th>Publisher</th><th>Risky Permissions</th></tr></thead>'
+            '<tbody>' + _rows(dfn_oauth_risks, ["AppName", "AppId", "Publisher", "RiskyPermissions"]) + '</tbody></table></div>'
+        ) if dfn_oauth_risks else '<p class="text-success small">No OAuth apps with overly broad permissions detected.</p>'
+
+        dfn_section = (
+            '<h2 class="section-header">Defender Security Posture</h2>'
+            '<div class="row g-3 mb-3">'
+            '<div class="col-sm-3"><div class="card text-center shadow-sm p-3">'
+            '<div class="display-6 fw-bold text-primary">' + escape(str(dfn_summary.get("SecureScorePercent", "N/A"))) + '%</div>'
+            '<small class="text-muted">Secure Score</small></div></div>'
+            '<div class="col-sm-3"><div class="card text-center shadow-sm p-3">'
+            '<div class="display-6 fw-bold ' + risky_cls + '">' + escape(str(risky_count)) + '</div>'
+            '<small class="text-muted">Risky Users (High/Med)</small></div></div>'
+            '<div class="col-sm-3"><div class="card text-center shadow-sm p-3">'
+            '<div class="display-6 fw-bold text-secondary">' + escape(str(dfn_mfa.get("MFACoveragePercent", "N/A"))) + '%</div>'
+            '<small class="text-muted">MFA Registration</small></div></div>'
+            '<div class="col-sm-3"><div class="card text-center shadow-sm p-3">'
+            '<div class="display-6 fw-bold ' + oauth_cls + '">' + escape(str(oauth_count)) + '</div>'
+            '<small class="text-muted">OAuth App Risks</small></div></div>'
+            '</div>' +
+            risky_table +
+            oauth_table
+        )
+    else:
+        dfn_section = '<p class="text-muted">Defender Posture assessment was not run.</p>'
+
+    # SharePoint Permissions section
+    if sp_sites:
+        site_cards = []
+        for site in sp_sites:
+            perm_rows = "".join(
+                "<tr><td>" + escape(str(p.get("user", ""))) + "</td><td>" + escape(", ".join(p.get("roles", []))) + "</td></tr>"
+                for p in site.get("permissions", [])
+            ) or "<tr><td colspan='2' class='text-muted'>No explicit permissions found.</td></tr>"
+
+            lib_html = ""
+            for lib in site.get("libraries", []):
+                lib_perm_rows = "".join(
+                    "<tr><td>" + escape(str(p.get("user", ""))) + "</td><td>" + escape(", ".join(p.get("roles", []))) + "</td></tr>"
+                    for p in lib.get("permissions", [])
+                ) or "<tr><td colspan='2' class='text-muted small'>Inherits site permissions.</td></tr>"
+                lib_html += (
+                    '<div class="ms-2 mb-2"><strong class="small">' + escape(lib.get("name", "")) + '</strong>'
+                    '<div class="table-responsive"><table class="table table-sm mb-0">'
+                    '<thead class="table-light"><tr><th>User / Group</th><th>Roles</th></tr></thead>'
+                    '<tbody>' + lib_perm_rows + '</tbody></table></div></div>'
+                )
+
+            site_cards.append(
+                '<div class="card mb-3 shadow-sm">'
+                '<div class="card-header fw-semibold">' + escape(site.get("name", "")) +
+                ' &mdash; <a href="' + escape(site.get("url", "")) + '" target="_blank" class="text-decoration-none small">' +
+                escape(site.get("url", "")) + '</a></div>'
+                '<div class="card-body p-2">'
+                '<h6 class="mb-1">Site Permissions</h6>'
+                '<div class="table-responsive mb-2"><table class="table table-sm mb-0">'
+                '<thead class="table-light"><tr><th>User / Group</th><th>Roles</th></tr></thead>'
+                '<tbody>' + perm_rows + '</tbody></table></div>' +
+                ('<h6 class="mt-2 mb-1">Document Libraries</h6>' + lib_html if lib_html else '<p class="text-muted small ms-2">No document libraries found.</p>') +
+                '</div></div>'
+            )
+        sp_section = '<h2 class="section-header">SharePoint Permissions</h2>' + "".join(site_cards)
+    elif sp_perms is not None:
+        sp_section = '<h2 class="section-header">SharePoint Permissions</h2><p class="text-muted">No sites returned.</p>'
+    else:
+        sp_section = ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -228,6 +416,26 @@ def generate(results: dict, tenant_url: str) -> str:
         <th>Label Name</th><th>Retention Action</th><th>Duration</th><th>Is Record Label</th>
       </tr></thead>
       <tbody>{_rows(ret_label_rows, ["LabelName","RetentionAction","RetentionDuration","IsRecordLabel"])}</tbody>
+    </table>
+  </div>
+
+  <!-- M365 Licensing -->
+  {lic_section}
+
+  <!-- Defender Security Posture -->
+  {dfn_section}
+
+  <!-- SharePoint Permissions -->
+  {sp_section}
+
+  <!-- Prioritised Recommendations -->
+  <h2 class="section-header">Prioritised Recommendations</h2>
+  <div class="table-responsive mb-4">
+    <table class="table table-sm table-striped table-hover">
+      <thead class="table-dark"><tr>
+        <th>Priority</th><th>Status</th><th>Area</th><th>Observation</th><th>Recommendation</th>
+      </tr></thead>
+      <tbody>{recommendations_html}</tbody>
     </table>
   </div>
 

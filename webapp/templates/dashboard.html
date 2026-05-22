@@ -72,6 +72,27 @@
             <label class="form-check-label" for="chkRet">Retention Labels &amp; Policies</label>
           </div>
         </div>
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="M365Licensing" id="chkLic" checked/>
+            <label class="form-check-label" for="chkLic">M365 Copilot Licensing</label>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="DefenderPosture" id="chkDef" checked/>
+            <label class="form-check-label" for="chkDef">Defender Security Posture</label>
+          </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+          <div class="form-check">
+            <input class="form-check-input assessment-cb" type="checkbox" name="assessments"
+                   value="SharePointPermissions" id="chkSPPerms"/>
+            <label class="form-check-label" for="chkSPPerms">SharePoint Permissions</label>
+          </div>
+        </div>
       </div>
 
       <div class="row g-3 align-items-center mb-3">
@@ -83,8 +104,8 @@
         </div>
         <div class="col-sm-6 col-lg-4 d-flex align-items-center gap-2">
           <label class="form-label mb-0 fw-semibold" for="sampleSize">Sample size per drive:</label>
-          <input type="number" id="sampleSize" name="sample_size" class="form-control form-control-sm"
-                 style="width:90px" value="100" min="0" max="5000"/>
+             <input type="number" id="sampleSize" name="sample_size" class="form-control form-control-sm sample-size-input"
+               value="100" min="0" max="5000"/>
           <span class="text-muted small">(0 = full scan)</span>
         </div>
       </div>
@@ -110,7 +131,7 @@
   </div>
 </div>
 
-<div class="card shadow-sm mb-4" id="logCard" style="display:none">
+<div class="card shadow-sm mb-4 d-none" id="logCard">
   <div class="card-header d-flex align-items-center justify-content-between">
     <span class="fw-semibold"><i class="bi bi-terminal me-1"></i>Live Output</span>
     <div class="spinner-border spinner-border-sm text-primary" id="spinner" role="status"></div>
@@ -188,7 +209,7 @@
 
   {% if running %}
   const logBox = document.getElementById('logBox');
-  document.getElementById('logCard').style.display = '';
+  document.getElementById('logCard').classList.remove('d-none');
 
   const src = new EventSource('{{ url_for('log_stream') }}');
   src.addEventListener('log', e => {
