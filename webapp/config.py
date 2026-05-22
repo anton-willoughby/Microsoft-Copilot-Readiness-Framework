@@ -1,8 +1,9 @@
 import os
 import tempfile
 
-# Well-known Microsoft Graph Command Line Tools public client
-GRAPH_CLIENT_ID = "14d82eec-204b-4c2f-b7e8-296a70dab67e"
+# Well-known Microsoft Graph Command Line Tools public client.
+# This keeps the consultant workflow simple: no client-created app registration is required.
+GRAPH_CLIENT_ID = os.environ.get("GRAPH_CLIENT_ID", "14d82eec-204b-4c2f-b7e8-296a70dab67e")
 
 GRAPH_AUTHORITY = "https://login.microsoftonline.com/common"
 

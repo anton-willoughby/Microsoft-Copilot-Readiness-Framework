@@ -2,8 +2,8 @@
 Microsoft Copilot Readiness Assessment — Flask web application.
 Converts the PowerShell-based CopilotReadiness module to a cross-platform Python web app.
 """
-import json
 import queue
+import re
 import threading
 import uuid
 from datetime import datetime
@@ -30,8 +30,6 @@ app.config.from_object(config)
 Session(app)
 
 # ── In-process state ──────────────────────────────────────────────────────────
-# Keyed by session id; holds the device-flow dict while user authenticates.
-_pending_flows: dict[str, dict] = {}
 # Log queue for SSE streaming; one queue per session.
 _log_queues: dict[str, queue.Queue] = {}
 # Assessment running flag per session.
@@ -61,84 +59,25 @@ def _log_fn(sid: str):
     return log
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Routes
-# ─────────────────────────────────────────────────────────────────────────────
+def _normalize_tenant_url(value: str) -> str | None:
+    tenant_url = (value or "").strip().rstrip("/")
+    if re.match(r"^https://[a-z0-9-]+-admin\.sharepoint\.com$", tenant_url, re.IGNORECASE):
+        return tenant_url
+    return None
 
-@app.route("/")
-def index():
-    sid = _session_id()
-    # Pull any completed background results into the session
+
+def _pull_pending_results(sid: str):
     if sid in _pending_results and not _running.get(sid):
         session["last_results"] = _pending_results.pop(sid)
         session.modified = True
-    running = _running.get(sid, False) or bool(request.args.get("running"))
-    results = session.get("last_results")
-    device_flow = None
-    flow_key = None
-
-    # Expose pending device flow to the template
-    fk = session.get("flow_key")
-    if fk and fk in _pending_flows:
-        flow_key = fk
-        device_flow = _pending_flows[fk]
-
-    return render_template(
-        "index.html",
-        running=running,
-        results=results,
-        device_flow=device_flow,
-        flow_key=flow_key,
-    )
 
 
-@app.route("/signin", methods=["POST"])
-def signin():
-    tenant_url = request.form.get("tenantUrl", "").strip().rstrip("/")
-    if not tenant_url:
-        flash("Tenant URL is required.", "danger")
-        return redirect(url_for("index"))
-
-    import re
-    if not re.match(r"^https://[a-z0-9-]+-admin\.sharepoint\.com$", tenant_url, re.IGNORECASE):
-        flash("Tenant URL must be in the format https://&lt;tenant&gt;-admin.sharepoint.com", "danger")
-        return redirect(url_for("index"))
-
-    try:
-        flow = auth_svc.start_device_flow()
-    except Exception as exc:
-        flash(f"Failed to start sign-in: {exc}", "danger")
-        return redirect(url_for("index"))
-
-    flow_key = str(uuid.uuid4())
-    _pending_flows[flow_key] = flow
-    session["flow_key"] = flow_key
-    session["tenant_url"] = tenant_url
-    return redirect(url_for("index"))
-
-
-@app.route("/signin/complete", methods=["POST"])
-def signin_complete():
-    flow_key = request.form.get("flow_key") or session.get("flow_key")
-    if not flow_key or flow_key not in _pending_flows:
-        flash("Sign-in session expired. Please try again.", "warning")
-        return redirect(url_for("index"))
-
-    flow = _pending_flows.pop(flow_key, None)
-    session.pop("flow_key", None)
-
-    try:
-        token_result = auth_svc.acquire_token_by_device_flow(flow)
-    except Exception as exc:
-        flash(f"Authentication failed: {exc}", "danger")
-        return redirect(url_for("index"))
-
+def _apply_token_result(token_result: dict):
     session["access_token"] = token_result["access_token"]
     account = token_result.get("id_token_claims", {})
     session["connected_user"] = account.get("upn") or account.get("preferred_username") or account.get("name", "")
     session["connected"] = True
 
-    # Resolve org display name
     try:
         from services.graph_client import graph_get
         org = graph_get(token_result["access_token"], f"{config.GRAPH_BASE}/organization?$select=displayName")
@@ -147,8 +86,52 @@ def signin_complete():
     except Exception:
         session["org_name"] = session.get("tenant_url", "")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/")
+def index():
+    _session_id()
+    if session.get("connected"):
+        return redirect(url_for("dashboard"))
+    return render_template("index.html")
+
+
+@app.route("/dashboard")
+def dashboard():
+    if not session.get("connected"):
+        flash("Sign in to begin an assessment.", "info")
+        return redirect(url_for("index"))
+
+    sid = _session_id()
+    _pull_pending_results(sid)
+    running = _running.get(sid, False) or bool(request.args.get("running"))
+    results = session.get("last_results")
+
+    return render_template(
+        "dashboard.html",
+        running=running,
+        results=results,
+        tenant_url=session.get("tenant_url", ""),
+    )
+
+
+@app.route("/signin")
+def signin():
+    if session.get("connected"):
+        return redirect(url_for("dashboard"))
+
+    try:
+        token_result = auth_svc.acquire_token_interactive()
+    except Exception as exc:
+        flash(f"Authentication failed: {exc}", "danger")
+        return redirect(url_for("index"))
+
+    _apply_token_result(token_result)
     flash(f"Connected as {session['connected_user']} to {session['org_name']}.", "success")
-    return redirect(url_for("index"))
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/signout")
@@ -165,15 +148,22 @@ def run_assessments():
         flash("Please sign in first.", "warning")
         return redirect(url_for("index"))
 
+    tenant_url = _normalize_tenant_url(request.form.get("tenantUrl", ""))
+    if not tenant_url:
+        flash("Enter a valid SharePoint Admin URL before running an assessment.", "warning")
+        return redirect(url_for("dashboard"))
+
+    session["tenant_url"] = tenant_url
+
     sid = _session_id()
     if _running.get(sid):
         flash("An assessment is already running.", "info")
-        return redirect(url_for("index"))
+        return redirect(url_for("dashboard"))
 
     selected = request.form.getlist("assessments")
     if not selected:
         flash("Select at least one assessment.", "warning")
-        return redirect(url_for("index"))
+        return redirect(url_for("dashboard"))
 
     include_od = bool(request.form.get("include_onedrive"))
     try:
@@ -226,7 +216,7 @@ def run_assessments():
         _running[sid] = False
 
     threading.Thread(target=_run, daemon=True).start()
-    return redirect(url_for("index") + "?running=1")
+    return redirect(url_for("dashboard") + "?running=1")
 
 
 # Sidecar for results from background threads
@@ -265,7 +255,7 @@ def report():
     results = session.get("last_results")
     if not results:
         flash("Run at least one assessment first.", "warning")
-        return redirect(url_for("index"))
+        return redirect(url_for("dashboard" if session.get("connected") else "index"))
     tenant_url = session.get("tenant_url", "")
     html = generate_report(results, tenant_url)
     return Response(html, mimetype="text/html")
@@ -276,7 +266,7 @@ def report_download():
     results = session.get("last_results")
     if not results:
         flash("Run at least one assessment first.", "warning")
-        return redirect(url_for("index"))
+        return redirect(url_for("dashboard" if session.get("connected") else "index"))
 
     tenant_url = session.get("tenant_url", "")
     html = generate_report(results, tenant_url)

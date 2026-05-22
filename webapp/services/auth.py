@@ -1,4 +1,4 @@
-"""MSAL device-code authentication for the Copilot Readiness web app."""
+"""MSAL interactive browser authentication for the Copilot Readiness web app."""
 import msal
 import config
 
@@ -10,19 +10,13 @@ def get_msal_app() -> msal.PublicClientApplication:
     )
 
 
-def start_device_flow() -> dict:
-    """Initiate device-code flow. Returns the flow dict containing user_code, verification_uri, etc."""
+def acquire_token_interactive() -> dict:
+    """Open Microsoft interactive sign-in and return an MSAL token response."""
     app = get_msal_app()
-    flow = app.initiate_device_flow(scopes=config.GRAPH_SCOPES)
-    if "user_code" not in flow:
-        raise RuntimeError(f"Failed to initiate device flow: {flow.get('error_description', flow)}")
-    return flow
-
-
-def acquire_token_by_device_flow(flow: dict) -> dict:
-    """Poll for token completion. Returns MSAL token response dict or raises on failure."""
-    app = get_msal_app()
-    result = app.acquire_token_by_device_flow(flow)
+    result = app.acquire_token_interactive(
+        scopes=config.GRAPH_SCOPES,
+        prompt="select_account",
+    )
     if "access_token" not in result:
         raise RuntimeError(result.get("error_description", str(result)))
     return result
