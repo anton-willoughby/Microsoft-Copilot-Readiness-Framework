@@ -371,7 +371,7 @@ Copilot surfaces content based on user permissions. Without proper sensitivity l
 
 **Framework Assessment Tool:**
 
-- `Get-LabelCoverage.ps1` - Calculates label coverage across tenant
+- Python web assessment app - Calculates label coverage across tenant
 - Identifies unlabeled sensitive content
 - Measures auto-labeling effectiveness
 
@@ -389,8 +389,8 @@ Copilot respects existing permissions. Overshared content becomes accessible to 
 
 **Framework Assessment Tool:**
 
-- `Get-OversharedContent.ps1` - Identifies overshared SharePoint and OneDrive content
-- `Get-ExternalUserAccess.ps1` - Audits external user access and permissions
+- Python web assessment app - Identifies overshared SharePoint and OneDrive content
+- Python web assessment app - Audits external user access and permissions
 
 ### 3. Conditional Access and Zero Trust
 
@@ -406,7 +406,7 @@ Zero Trust principles must be applied to AI tools. MFA and device compliance are
 
 **Framework Assessment Tool:**
 
-- `Get-CAPolicies.ps1` - Reviews Conditional Access policies for Copilot compatibility
+- Python web assessment app - Reviews Conditional Access policies for Copilot compatibility
 - Identifies blocking policies
 - Recommends Copilot-specific policies
 
@@ -491,7 +491,7 @@ Organizations discover these gaps during Copilot readiness assessments, requirin
 ### Barrier 2: Overshared Content
 
 **The Problem:**
-The framework's `Get-OversharedContent.ps1` script commonly identifies:
+The framework's overshared content assessment commonly identifies:
 
 - Content shared with "Everyone" or "Everyone except external"
 - Anonymous/Anyone sharing links
@@ -511,7 +511,7 @@ Copilot surfaces content based on user permissions. Overshared content becomes a
 ### Barrier 3: Conditional Access Policy Conflicts
 
 **The Problem:**
-The framework's `Get-CAPolicies.ps1` script often identifies:
+The framework's Conditional Access assessment often identifies:
 
 - Policies that inadvertently block Copilot apps
 - Missing MFA requirements for AI tools
@@ -531,7 +531,7 @@ Zero Trust policies designed to protect the organization can block Copilot funct
 ### Barrier 4: External User Access Risks
 
 **The Problem:**
-The framework's `Get-ExternalUserAccess.ps1` script commonly finds:
+The framework's external user access assessment commonly finds:
 
 - Unmanaged external users with broad access
 - Inactive external accounts (>90 days)
@@ -615,15 +615,11 @@ Lack of coordination leads to:
 
 ### 2. Conduct Comprehensive Readiness Assessment
 
-**Recommendation:** Use the Microsoft Copilot Readiness Framework to assess all six dimensions.
+**Recommendation:** Use the Microsoft Copilot Readiness Framework to assess all readiness dimensions.
 
 **Actions:**
 
-- Run all four assessment scripts:
-  - `Get-OversharedContent.ps1`
-  - `Get-LabelCoverage.ps1`
-  - `Get-ExternalUserAccess.ps1`
-  - `Get-CAPolicies.ps1`
+- Run the Python assessment app across the available readiness checks.
 - Document findings and risk levels
 - Prioritize remediation based on readiness scores
 
@@ -780,7 +776,7 @@ Successful Copilot implementation requires:
 The Microsoft Copilot Readiness Framework provides:
 
 - **Structured Assessment:** Six critical dimensions with measurable metrics
-- **Automated Tools:** PowerShell scripts for data collection and analysis
+- **Automated Tools:** Python web application for data collection and analysis
 - **Risk Prioritization:** Clear readiness scores and remediation guidance
 - **Proven Methodology:** Based on Microsoft's official guidance and best practices
 
@@ -811,11 +807,7 @@ Organizations that follow a compliance-first approach, leverage the framework's 
 ### Framework Resources
 
 1. Microsoft Copilot Readiness Framework (Microsoft_Copilot_Readiness_Framework.docx)
-2. Framework Assessment Scripts:
-   - Get-OversharedContent.ps1
-   - Get-LabelCoverage.ps1
-   - Get-ExternalUserAccess.ps1
-   - Get-CAPolicies.ps1
+2. Python assessment application (`webapp/`)
 3. Framework README.md
 
 ---

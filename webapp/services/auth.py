@@ -22,6 +22,35 @@ def acquire_token_interactive() -> dict:
     return result
 
 
+def reacquire_token_for_consent() -> dict:
+    """Force a fresh interactive sign-in with explicit consent prompt.
+
+    Use this when a cached token is missing required scopes — the user sees
+    the Microsoft consent screen for any scope not yet approved.
+    """
+    app = get_msal_app()
+    result = app.acquire_token_interactive(
+        scopes=config.GRAPH_SCOPES,
+        prompt="consent",
+    )
+    if "access_token" not in result:
+        raise RuntimeError(result.get("error_description", str(result)))
+    return result
+
+
+def check_missing_scopes(token_result: dict) -> list[str]:
+    """Return scopes from GRAPH_SCOPES that were NOT included in the token response.
+
+    MSAL returns granted scopes in ``token_result["scope"]`` as a space-separated
+    string.  We compare normalised lower-case short names so that URL-form scopes
+    (``https://graph.microsoft.com/Foo.Bar``) are handled correctly.
+    """
+    raw = token_result.get("scope", "")
+    granted = {s.lower().split("/")[-1] for s in raw.split() if s}
+    missing = [s for s in config.GRAPH_SCOPES if s.lower() not in granted]
+    return missing
+
+
 def get_cached_token(account_info: dict | None) -> str | None:
     """Try to silently refresh a cached token. Returns access_token string or None."""
     if not account_info:

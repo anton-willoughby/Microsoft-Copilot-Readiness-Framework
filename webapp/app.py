@@ -85,6 +85,9 @@ def _apply_token_result(token_result: dict):
     session["connected_user"] = account.get("upn") or account.get("preferred_username") or account.get("name", "")
     session["connected"] = True
 
+    missing = auth_svc.check_missing_scopes(token_result)
+    session["missing_scopes"] = missing  # empty list = all scopes granted
+
     try:
         from services.graph_client import graph_get
         org = graph_get(token_result["access_token"], f"{config.GRAPH_BASE}/organization?$select=displayName")
@@ -146,6 +149,32 @@ def signout():
     session.clear()
     flash("You have been signed out.", "info")
     return redirect(url_for("index"))
+
+
+@app.route("/reauth")
+def reauth():
+    """Force a fresh interactive login with consent prompt.
+
+    Used when the stored token is missing required scopes — presents the
+    Microsoft consent screen so the user can approve any new permissions.
+    """
+    try:
+        token_result = auth_svc.reacquire_token_for_consent()
+    except Exception as exc:
+        flash(f"Re-authentication failed: {exc}", "danger")
+        return redirect(url_for("dashboard"))
+
+    _apply_token_result(token_result)
+    missing = session.get("missing_scopes", [])
+    if missing:
+        flash(
+            f"Re-authenticated, but the following permissions were still not granted: "
+            f"{', '.join(missing)}. Some assessments may be limited.",
+            "warning",
+        )
+    else:
+        flash("Permissions refreshed successfully — all required scopes are now granted.", "success")
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/run", methods=["POST"])

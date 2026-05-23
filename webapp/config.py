@@ -12,8 +12,13 @@ GRAPH_SCOPES = [
     "Directory.Read.All",
     "User.Read.All",
     "AuditLog.Read.All",
+    "Reports.Read.All",
     "Sites.Read.All",
     "Files.Read.All",
+    # Defender / Security assessments
+    "SecurityEvents.Read.All",
+    "IdentityRiskyUser.Read.All",
+    "UserAuthenticationMethod.Read.All",
 ]
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"

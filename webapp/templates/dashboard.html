@@ -18,6 +18,28 @@
   </a>
 </div>
 
+{% if session.get('missing_scopes') %}
+<div class="alert alert-warning d-flex align-items-start gap-3 mb-4" role="alert">
+  <i class="bi bi-exclamation-triangle-fill fs-5 mt-1 flex-shrink-0"></i>
+  <div class="flex-grow-1">
+    <strong>Some Microsoft 365 permissions were not granted.</strong>
+    The following assessments may return limited or no data until these permissions are approved:
+    <ul class="mb-2 mt-1">
+      {% for scope in session.get('missing_scopes', []) %}
+      <li><code>{{ scope }}</code></li>
+      {% endfor %}
+    </ul>
+    <small class="text-muted">
+      Click <strong>Refresh Permissions</strong> to re-authenticate and approve the missing consents.
+      You must be a Global Administrator to consent to admin-required scopes.
+    </small>
+  </div>
+  <a href="{{ url_for('reauth') }}" class="btn btn-warning btn-sm flex-shrink-0">
+    <i class="bi bi-shield-lock me-1"></i>Refresh Permissions
+  </a>
+</div>
+{% endif %}
+
 <div class="card shadow-sm mb-4">
   <div class="card-header fw-semibold"><i class="bi bi-clipboard-check me-1"></i>Assessments</div>
   <div class="card-body">
